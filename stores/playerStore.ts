@@ -16,8 +16,9 @@ interface PlayerState {
     repeatMode: RepeatMode;
     isShuffleOn: boolean;
     sleepTimerEndsAt: number | null;
+    currentContextId: string | null;
     // Actions
-    play: (track: Track, contextQueue?: Track[]) => Promise<void>;
+    play: (track: Track, contextQueue?: Track[], contextId?: string) => Promise<void>;
     pause: () => Promise<void>;
     resume: () => Promise<void>;
     next: () => Promise<void>;
@@ -28,6 +29,7 @@ interface PlayerState {
     setupPlayer: () => Promise<void>;
     stop: () => Promise<void>;
     setSleepTimer: (minutes: number | null) => void;
+    removeFromQueue: (trackId: string) => Promise<void>;
 }
 
 import { storage, StorageKeys } from '@/utils/storage';
@@ -41,6 +43,7 @@ const mmkvStorage = {
 };
 
 let sleepTimeout: any = null;
+let consecutiveErrors = 0;
 
 export const usePlayerStore = create<PlayerState>()(
     persist(
@@ -51,6 +54,7 @@ export const usePlayerStore = create<PlayerState>()(
             repeatMode: RepeatMode.Off,
             isShuffleOn: false,
             sleepTimerEndsAt: null,
+            currentContextId: null,
 
             setupPlayer: async () => {
                 // Initialize the player
@@ -87,10 +91,29 @@ export const usePlayerStore = create<PlayerState>()(
                     });
 
                     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async () => {
+                        consecutiveErrors = 0; // Reset on successful track change
                         const index = await TrackPlayer.getActiveTrackIndex();
                         if (index !== undefined && index !== null) {
                             const track = await TrackPlayer.getTrack(index);
                             if (track) set({ activeTrack: track as any });
+                        }
+                    });
+
+                    TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
+                        console.error("[TrackPlayer] Playback Error:", error);
+                        consecutiveErrors++;
+
+                        if (consecutiveErrors < 5) {
+                            // Instant graceful skip
+                            await TrackPlayer.skipToNext();
+                            await TrackPlayer.play();
+                        } else {
+                            // Catastrophic failure guard
+                            console.warn("[TrackPlayer] Too many consecutive errors. Stopping.");
+                            await TrackPlayer.reset();
+                            set({ isPlaying: false, activeTrack: null });
+                            consecutiveErrors = 0;
+                            Alert.alert("Playback Error", "Failed to play multiple tracks. Please check your files.");
                         }
                     });
 
@@ -141,40 +164,88 @@ export const usePlayerStore = create<PlayerState>()(
                 }
             },
 
-            play: async (track: Track, contextQueue) => {
+            play: async (track: Track, contextQueue, contextId) => {
                 const currentQueue = contextQueue || [track];
 
-                // Safety: ensure setup has been called
+                // Safety: ensure setup has been called before any bridge commands
                 try {
-                    const state = await TrackPlayer.getPlaybackState();
-                    if (state.state === State.None) {
+                    const status = await TrackPlayer.getPlaybackState();
+                    if (status.state === State.None) {
                         await get().setupPlayer();
                     }
                 } catch (e) {
                     await get().setupPlayer();
                 }
 
-                // Convert to TrackPlayer Object
-                const trackPlayerQueue = currentQueue.map(t => ({
+                const prevContextId = get().currentContextId;
+
+                // Apollo Smart Skip: same context → just seek, no bridge reset
+                if (contextId && prevContextId === contextId) {
+                    const index = currentQueue.findIndex(t => t.id === track.id);
+                    if (index !== -1) {
+                        consecutiveErrors = 0; // Manual play resets error counter
+                        await TrackPlayer.skip(index);
+                        await TrackPlayer.play();
+                        set({ activeTrack: track, isPlaying: true });
+                        return;
+                    }
+                }
+
+                // Stage 1: Build the priority window synchronously (no bridge calls yet)
+                // Find target index once, reuse it — avoid double scan on large libraries
+                const targetIndex = currentQueue.findIndex(t => t.id === track.id);
+                const startIndex = Math.max(0, targetIndex);
+                const priorityWindow = currentQueue.slice(startIndex, startIndex + 21);
+
+                const toTrackPlayer = (t: Track) => ({
                     id: t.id,
                     url: t.url,
                     title: t.title,
                     artist: t.artist,
                     duration: t.duration || 0,
-                    artwork: t.artwork
-                }));
+                    artwork: t.artwork,
+                });
 
+                // Update Zustand state immediately (UI reflects new track at once)
+                set({
+                    activeTrack: track,
+                    isPlaying: true,
+                    queue: currentQueue,
+                    currentContextId: contextId || null,
+                });
+
+                // Stage 2: Fire bridge calls — reset + add priority window + play
+                // These are the only await calls on the hot path
+                consecutiveErrors = 0; // Reset on cold start play
                 await TrackPlayer.reset();
-                await TrackPlayer.add(trackPlayerQueue);
-
-                // Find index of the clicked track
-                const index = trackPlayerQueue.findIndex(t => t.id === track.id);
-                if (index !== -1) {
-                    await TrackPlayer.skip(index);
-                }
-
+                await TrackPlayer.add(priorityWindow.map(toTrackPlayer));
                 await TrackPlayer.play();
-                set({ activeTrack: track, isPlaying: true, queue: currentQueue });
+
+                // Stage 3: Background chunking (fire-and-forget)
+                const remainingAfter = currentQueue.slice(startIndex + 21);
+                const remainingBefore = currentQueue.slice(0, startIndex);
+                const capturedContextId = contextId;
+
+                const backgroundSync = async () => {
+                    const CHUNK_SIZE = 50;
+
+                    for (let i = 0; i < remainingAfter.length; i += CHUNK_SIZE) {
+                        if (get().currentContextId !== capturedContextId) return;
+                        await TrackPlayer.add(
+                            remainingAfter.slice(i, i + CHUNK_SIZE).map(toTrackPlayer)
+                        );
+                    }
+
+                    for (let i = 0; i < remainingBefore.length; i += CHUNK_SIZE) {
+                        if (get().currentContextId !== capturedContextId) return;
+                        await TrackPlayer.add(
+                            remainingBefore.slice(i, i + CHUNK_SIZE).map(toTrackPlayer),
+                            i
+                        );
+                    }
+                };
+
+                backgroundSync();
             },
 
             pause: async () => {
@@ -240,6 +311,19 @@ export const usePlayerStore = create<PlayerState>()(
                     set({ isPlaying: false, sleepTimerEndsAt: null });
                     sleepTimeout = null;
                 }, minutes * 60 * 1000);
+            },
+
+            removeFromQueue: async (trackId: string) => {
+                const { queue } = get();
+                const index = queue.findIndex(t => t.id === trackId);
+                if (index !== -1) {
+                    const newQueue = [...queue];
+                    newQueue.splice(index, 1);
+                    set({ queue: newQueue });
+                    
+                    // Also remove from native player
+                    await TrackPlayer.remove(index);
+                }
             }
         }),
         {
@@ -251,6 +335,7 @@ export const usePlayerStore = create<PlayerState>()(
                 repeatMode: state.repeatMode,
                 isShuffleOn: state.isShuffleOn,
                 sleepTimerEndsAt: state.sleepTimerEndsAt,
+                currentContextId: state.currentContextId,
             }),
             // Never persist isPlaying; always start paused after restart
         }

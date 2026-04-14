@@ -1,6 +1,7 @@
 import { useTheme } from '@/constants/theme';
 import { usePlayerStore } from '@/stores/playerStore';
 import { Ionicons } from '@expo/vector-icons';
+import { QueueModal } from '@/components/QueueModal';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
@@ -115,6 +116,7 @@ const PlayerScreen = () => {
     const insets = useSafeAreaInsets();
     const { colors, fonts, cornerRadius, spacing, isDark } = useTheme();
     const { position, duration } = useProgress();
+    const [showQueue, setShowQueue] = useState(false);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -231,11 +233,13 @@ const PlayerScreen = () => {
                         <Ionicons name="share-outline" size={20} color={colors.textMuted} />
                         <Text style={[styles.optionLabel, { color: colors.textMuted }]}>Share</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.optionBtn}>
+                    <TouchableOpacity style={styles.optionBtn} onPress={() => setShowQueue(true)}>
                         <Ionicons name="list" size={20} color={colors.textMuted} />
                         <Text style={[styles.optionLabel, { color: colors.textMuted }]}>Up Next</Text>
                     </TouchableOpacity>
                 </View>
+
+                <QueueModal visible={showQueue} onClose={() => setShowQueue(false)} />
             </View>
         </View>
     );

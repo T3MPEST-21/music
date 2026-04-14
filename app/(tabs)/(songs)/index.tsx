@@ -1,3 +1,5 @@
+import { MoodPickerModal } from '@/components/MoodPickerModal';
+import { PlaylistPickerModal } from '@/components/PlaylistPickerModal';
 import { SongList } from '@/components/SongList';
 import { useTheme } from '@/constants/theme';
 import { useLibraryStore } from '@/stores/libraryStore';
@@ -96,6 +98,10 @@ const SongsScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeMoodId, setActiveMoodId] = useState<string | 'all'>('all');
     const [actionMoodId, setActionMoodId] = useState<string | null>(null);
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [showBulkMoodPicker, setShowBulkMoodPicker] = useState(false);
+    const [showBulkPlaylistPicker, setShowBulkPlaylistPicker] = useState(false);
 
     useEffect(() => {
         if (!initialized) loadFromCache();
@@ -130,6 +136,8 @@ const SongsScreen = () => {
 
         return result;
     }, [tracks, sortMode, searchQuery, activeMoodId, moods]);
+
+    const activeContextId = `songs-${activeMoodId}-${sortMode}`;
 
     const handleDeleteMood = (moodId: string, moodName: string) => {
         const taggedCount = getMoodTrackIds(moodId).length;
@@ -222,11 +230,19 @@ const SongsScreen = () => {
 
                     <TouchableOpacity style={styles.dropItem} onPress={() => {
                         const shuffled = shuffleArray([...filteredAndSortedTracks]);
-                        if (shuffled.length > 0) usePlayerStore.getState().play(shuffled[0], shuffled);
+                        if (shuffled.length > 0) usePlayerStore.getState().play(shuffled[0], shuffled, activeContextId);
                         setShowMenu(false);
                     }}>
                         <Ionicons name="shuffle" size={18} color={colors.text} />
                         <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Shuffle All</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.dropItem} onPress={() => {
+                        setSelectionMode(true);
+                        setShowMenu(false);
+                    }}>
+                        <Ionicons name="checkbox-outline" size={18} color={colors.text} />
+                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Select Songs</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.dropItem} onPress={() => {
@@ -315,7 +331,10 @@ const SongsScreen = () => {
                                     </View>
                                     
                                     <TouchableOpacity style={styles.dropItem} onPress={() => {
-                                        if (moodTracks.length > 0) usePlayerStore.getState().play(moodTracks[0], moodTracks);
+                                        if (moodTracks.length > 0) {
+                                            const moodContextId = `mood-${selectedMood.id}`;
+                                            usePlayerStore.getState().play(moodTracks[0], moodTracks, moodContextId);
+                                        }
                                         setActionMoodId(null);
                                     }}>
                                         <Ionicons name="play" size={18} color={selectedMood.color} />
@@ -324,7 +343,10 @@ const SongsScreen = () => {
                                     
                                     <TouchableOpacity style={styles.dropItem} onPress={() => {
                                         const shuffled = shuffleArray([...moodTracks]);
-                                        if (shuffled.length > 0) usePlayerStore.getState().play(shuffled[0], shuffled);
+                                        if (shuffled.length > 0) {
+                                            const moodContextId = `mood-${selectedMood.id}-shuffled`;
+                                            usePlayerStore.getState().play(shuffled[0], shuffled, moodContextId);
+                                        }
                                         setActionMoodId(null);
                                     }}>
                                         <Ionicons name="shuffle" size={18} color={colors.text} />
@@ -347,7 +369,75 @@ const SongsScreen = () => {
                 </TouchableOpacity>
             </Modal>
 
-            <SongList tracks={filteredAndSortedTracks} />
+            <SongList 
+                tracks={filteredAndSortedTracks} 
+                contextId={activeContextId}
+                selectionMode={selectionMode}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+            />
+
+            {/* Bulk Action Bar */}
+            {selectionMode && selectedIds.size > 0 && (
+                <View style={[styles.bulkBar, { 
+                    backgroundColor: isDark ? '#1a1a1a' : '#fff',
+                    bottom: insets.bottom + 70, // Float above tab bar
+                    borderRadius: cornerRadius,
+                    marginHorizontal: spacing.horizontal,
+                }]}>
+                    <Text style={[styles.bulkCount, { color: colors.text, fontSize: fonts.sm }]}>
+                        {selectedIds.size} Selected
+                    </Text>
+                    <View style={styles.bulkActions}>
+                        <TouchableOpacity 
+                            style={[styles.bulkBtn, { backgroundColor: colors.primary + '15' }]}
+                            onPress={() => setShowBulkMoodPicker(true)}
+                        >
+                            <Ionicons name="pricetag" size={16} color={colors.primary} />
+                            <Text style={[styles.bulkBtnText, { color: colors.primary, fontSize: fonts.xs }]}>Mood</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.bulkBtn, { backgroundColor: colors.primary + '15' }]}
+                            onPress={() => setShowBulkPlaylistPicker(true)}
+                        >
+                            <Ionicons name="add-circle" size={16} color={colors.primary} />
+                            <Text style={[styles.bulkBtnText, { color: colors.primary, fontSize: fonts.xs }]}>Playlist</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={styles.bulkCloseBtn}
+                            onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }}
+                        >
+                            <Ionicons name="close" size={20} color={colors.textMuted} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
+            {/* Bulk Mood Picker */}
+            {showBulkMoodPicker && (
+                <MoodPickerModal
+                    visible={showBulkMoodPicker}
+                    trackIds={Array.from(selectedIds)}
+                    onClose={() => {
+                        setShowBulkMoodPicker(false);
+                        setSelectionMode(false);
+                        setSelectedIds(new Set());
+                    }}
+                />
+            )}
+
+            {/* Bulk Playlist Picker */}
+            {showBulkPlaylistPicker && (
+                <PlaylistPickerModal
+                    visible={showBulkPlaylistPicker}
+                    trackIds={Array.from(selectedIds)}
+                    onClose={() => {
+                        setShowBulkPlaylistPicker(false);
+                        setSelectionMode(false);
+                        setSelectedIds(new Set());
+                    }}
+                />
+            )}
         </View>
     );
 };
@@ -443,5 +533,42 @@ const styles = StyleSheet.create({
         width: 200,
         paddingVertical: 8,
         elevation: 10,
+    },
+    bulkBar: {
+        position: 'absolute',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        elevation: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    bulkCount: {
+        fontWeight: '700',
+    },
+    bulkActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    bulkBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    bulkBtnText: {
+        fontWeight: 'bold',
+    },
+    bulkCloseBtn: {
+        padding: 4,
     },
 });

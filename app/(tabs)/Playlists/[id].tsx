@@ -213,10 +213,12 @@ export default function PlaylistDetailScreen() {
                             ))}
                         </>
                     )}
-                    <TouchableOpacity style={styles.dropItem} onPress={() => { setShowMenu(false); setReorderMode(true); }}>
-                        <Ionicons name="reorder-three" size={17} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Reorder Songs...</Text>
-                    </TouchableOpacity>
+                    {!isSearchActive && (
+                        <TouchableOpacity style={styles.dropItem} onPress={() => { setShowMenu(false); setReorderMode(true); }}>
+                            <Ionicons name="reorder-three" size={17} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Reorder Songs...</Text>
+                        </TouchableOpacity>
+                    )}
                     {!playlist.isPinned && (
                         <TouchableOpacity style={styles.dropItem} onPress={handleDelete}>
                             <Ionicons name="trash-outline" size={17} color={isDark ? "#e74c3c" : "#d32f2f"} />
@@ -244,7 +246,7 @@ export default function PlaylistDetailScreen() {
                     {playlistTracks.length > 0 && (
                         <TouchableOpacity
                             style={[styles.playBtn, { backgroundColor: colors.primary }]}
-                            onPress={() => playlistTracks.length > 0 && play(playlistTracks[0], playlistTracks)}
+                            onPress={() => playlistTracks.length > 0 && play(playlistTracks[0], playlistTracks, `playlist-${id}`)}
                         >
                             <Ionicons name="play" size={16} color="#fff" />
                             <Text style={[styles.playBtnText, { fontSize: fonts.xs }]}>Play All</Text>
@@ -258,11 +260,12 @@ export default function PlaylistDetailScreen() {
                 tracks={filteredTracks}
                 reorderMode={reorderMode}
                 focusedTrackId={focusedTrackId}
+                contextId={`playlist-${id}`}
                 onSelect={(track: Track) => {
                     if (reorderMode) {
                         setFocusedTrackId(track.id === focusedTrackId ? null : track.id);
                     } else {
-                        play(track, filteredTracks);
+                        play(track, filteredTracks, `playlist-${id}`);
                     }
                 }}
                 onRemove={(track) => id && removeTrackFromPlaylist(id, track.id)}

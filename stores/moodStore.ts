@@ -68,6 +68,7 @@ interface MoodState {
     tagTrack: (trackId: string, moodId: string) => void;
     untagTrack: (trackId: string, moodId: string) => void;
     setTrackMoods: (trackId: string, moodIds: string[]) => void;
+    setBulkTrackMoods: (trackIds: string[], moodIds: string[]) => void;
     getTrackMoods: (trackId: string) => Mood[];
     getMoodTrackIds: (moodId: string) => string[];
     getTaggedTrackCount: (moodId: string) => number;
@@ -140,6 +141,21 @@ export const useMoodStore = create<MoodState>((set, get) => ({
             } else {
                 updated[trackId] = moodIds;
             }
+            persistTrackMoodMap(updated);
+            return { trackMoodMap: updated };
+        });
+    },
+
+    setBulkTrackMoods: (trackIds, moodIds) => {
+        set(state => {
+            const updated = { ...state.trackMoodMap };
+            trackIds.forEach(id => {
+                if (moodIds.length === 0) {
+                    delete updated[id];
+                } else {
+                    updated[id] = moodIds;
+                }
+            });
             persistTrackMoodMap(updated);
             return { trackMoodMap: updated };
         });

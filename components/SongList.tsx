@@ -29,9 +29,10 @@ interface SongListProps {
     onMoveStart?: (index: number, direction: 'up' | 'down') => void;
     onMoveEnd?: () => void;
     onRemove?: (track: Track) => void;
+    contextId?: string;
 }
 
-const SongItem = ({
+const SongItem = React.memo(({
     track,
     index,
     isPlaying,
@@ -123,7 +124,7 @@ const SongItem = ({
             )}
         </TouchableOpacity>
     );
-};
+});
 
 export const SongList = ({
     tracks,
@@ -136,6 +137,7 @@ export const SongList = ({
     onMoveStart,
     onMoveEnd,
     onRemove,
+    contextId,
 }: SongListProps) => {
     const { colors, fonts } = useTheme();
     const { play, activeTrack } = usePlayerStore();
@@ -160,7 +162,7 @@ export const SongList = ({
                         index={index}
                         isPlaying={activeTrack?.id === item.id}
                         isFocused={focusedTrackId === item.id}
-                        onSelect={() => onSelect ? onSelect(item) : play(item, tracks)}
+                        onSelect={() => onSelect ? onSelect(item) : play(item, tracks, contextId)}
                         selectionMode={selectionMode}
                         isSelected={selectedIds?.has(item.id)}
                         onToggleSelect={() => toggleSelect(item.id)}
@@ -213,7 +215,7 @@ export const SongList = ({
             {moodPickerTrack && (
                 <MoodPickerModal
                     visible={!!moodPickerTrack}
-                    trackId={moodPickerTrack.id}
+                    trackIds={[moodPickerTrack.id]}
                     onClose={() => setMoodPickerTrack(null)}
                 />
             )}

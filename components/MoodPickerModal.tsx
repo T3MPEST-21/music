@@ -15,22 +15,26 @@ import {
 
 interface Props {
     visible: boolean;
-    trackId: string;
+    trackIds: string[];
     onClose: () => void;
 }
 
-export const MoodPickerModal: React.FC<Props> = ({ visible, trackId, onClose }) => {
+export const MoodPickerModal: React.FC<Props> = ({ visible, trackIds, onClose }) => {
     const { colors, fonts, cornerRadius, isDark } = useTheme();
-    const { moods, trackMoodMap, setTrackMoods } = useMoodStore();
+    const { moods, trackMoodMap, setBulkTrackMoods } = useMoodStore();
     const [showAddMood, setShowAddMood] = useState(false);
 
-    // Local selection state (initialized from store every open)
-    const currentMoodIds = trackMoodMap[trackId] || [];
-    const [selected, setSelected] = useState<Set<string>>(new Set(currentMoodIds));
+    // Local selection state
+    const [selected, setSelected] = useState<Set<string>>(new Set());
 
     const handleOpen = () => {
-        // Sync selection when modal opens
-        setSelected(new Set(trackMoodMap[trackId] || []));
+        // If single track, show its current moods. 
+        // If bulk selection, start fresh (overwrite mode) to avoid confusion.
+        if (trackIds.length === 1) {
+            setSelected(new Set(trackMoodMap[trackIds[0]] || []));
+        } else {
+            setSelected(new Set());
+        }
     };
 
     const toggleMood = (moodId: string) => {
@@ -42,7 +46,7 @@ export const MoodPickerModal: React.FC<Props> = ({ visible, trackId, onClose }) 
     };
 
     const handleDone = () => {
-        setTrackMoods(trackId, Array.from(selected));
+        setBulkTrackMoods(trackIds, Array.from(selected));
         onClose();
     };
 
