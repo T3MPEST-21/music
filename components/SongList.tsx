@@ -9,11 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     FlatList,
-    Pressable,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 interface SongListProps {
@@ -66,7 +65,7 @@ const SongItem = React.memo(({
     return (
         <TouchableOpacity
             style={[
-                styles.itemContainer, 
+                styles.itemContainer,
                 isPlaying && { backgroundColor: colors.primary + '15' },
                 isFocused && { backgroundColor: colors.primary + '30', borderLeftWidth: 4, borderLeftColor: colors.primary }
             ]}
