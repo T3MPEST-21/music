@@ -9,6 +9,8 @@ import TrackPlayer, {
 import { create } from "zustand";
 import { Track } from "./libraryStore";
 import { useThemeStore } from "./themeStore";
+import { useToastStore } from "./toastStore";
+import * as FileSystem from 'expo-file-system';
 
 /**
  * Apollo Rule: Android requires file:// prefix for local filesystem paths.
@@ -19,6 +21,19 @@ const formatUrl = (url: string) => {
         return `file://${url}`;
     }
     return url;
+};
+
+/**
+ * Android Resiliency: Pre-flight check to prevent android-io crash loops.
+ */
+const checkPathHealth = async (url: string): Promise<boolean> => {
+    try {
+        if (url.startsWith('http')) return true;
+        const info = await FileSystem.getInfoAsync(url);
+        return info.exists;
+    } catch (e) {
+        return false;
+    }
 };
 
 interface PlayerState {
@@ -201,6 +216,34 @@ export const usePlayerStore = create<PlayerState>()(
                     await get().setupPlayer();
                 }
 
+                const status = await TrackPlayer.getPlaybackState();
+
+                // Pre-flight Path Check (Android Resiliency)
+                const formattedUrl = formatUrl(track.url);
+                const isHealthy = await checkPathHealth(formattedUrl);
+                
+                if (!isHealthy) {
+                    console.warn(`[PlayerStore] Path health check failed for: ${track.title}`);
+                    useToastStore.getState().showToast(`File not found: ${track.title}`, 'error');
+                    
+                    // Exclude from session
+                    const filteredQueue = currentQueue.filter(t => t.id !== track.id);
+                    set({ queue: filteredQueue });
+
+                    // Auto-advance to next valid track
+                    const nextIndex = currentQueue.findIndex(t => t.id === track.id) + 1;
+                    if (nextIndex < currentQueue.length) {
+                        // Apollo Rule: Limit recursion to prevent infinite loops on broken libraries
+                        if (consecutiveErrors > 10) {
+                            Alert.alert("Library Sync Failed", "Too many missing files. Please refresh your library.");
+                            return;
+                        }
+                        consecutiveErrors++;
+                        return get().play(currentQueue[nextIndex], filteredQueue, contextId);
+                    }
+                    return;
+                }
+
                 const prevContextId = get().currentContextId;
 
                 // 2. Smart Skip (Same Context Logic)
@@ -244,6 +287,20 @@ export const usePlayerStore = create<PlayerState>()(
                     currentContextId: contextId || null,
                 });
 
+                // Check if we can do a Seamless Sync (Same context or shuffle toggle)
+                if (status.state === State.Playing && contextId && prevContextId && contextId.startsWith(prevContextId.split('_')[0])) {
+                     // If we are already playing and just synced (e.g. shuffle toggle), 
+                     // we don't reset. We let the background sync handle it.
+                     // But we must ensure the active track index matches.
+                     const nativeQueue = await TrackPlayer.getQueue();
+                     const nativeIndex = nativeQueue.findIndex(t => (t as any).id === track.id);
+                     if (nativeIndex !== -1) {
+                         // Already correct, just align the rest of the queue
+                         backgroundSync(true); // forceReplace = true
+                         return;
+                     }
+                }
+
                 try {
                     consecutiveErrors = 0;
                     // AVOID RACE: Strict sequential bridge commands
@@ -259,30 +316,51 @@ export const usePlayerStore = create<PlayerState>()(
                 const remainingBefore = currentQueue.slice(0, startIndex);
                 const capturedContextId = contextId;
 
-                const backgroundSync = async () => {
+                 const backgroundSync = async (forceReplace = false) => {
                     const CHUNK_SIZE = 30;
-                    // Yield the bridge for a moment after initial play
-                    await sleep(1500);
+                    try {
+                        // Yield the bridge for a moment after initial play
+                        await sleep(1500);
 
-                    for (let i = 0; i < remainingAfter.length; i += CHUNK_SIZE) {
-                        // cancellation check
-                        if (currentSyncId !== capturedSyncId || get().currentContextId !== capturedContextId) return;
-                        
-                        await TrackPlayer.add(
-                            remainingAfter.slice(i, i + CHUNK_SIZE).map(toTrackPlayer)
-                        );
-                        // yield the bridge
-                        await sleep(500);
-                    }
+                        if (forceReplace) {
+                            // Apollo Air-Lock: If we are syncing a new queue order onto a running track,
+                            // we must remove all other tracks from the native player first.
+                            const nativeQueue = await TrackPlayer.getQueue();
+                            const activeIndex = await TrackPlayer.getActiveTrackIndex();
+                            
+                            if (activeIndex !== undefined) {
+                                const indicesToRemove = nativeQueue
+                                    .map((_, i) => i)
+                                    .filter(i => i !== activeIndex);
+                                
+                                if (indicesToRemove.length > 0) {
+                                    await TrackPlayer.remove(indicesToRemove);
+                                }
+                            }
+                        }
 
-                    for (let i = 0; i < remainingBefore.length; i += CHUNK_SIZE) {
-                        if (currentSyncId !== capturedSyncId || get().currentContextId !== capturedContextId) return;
-                        
-                        await TrackPlayer.add(
-                            remainingBefore.slice(i, i + CHUNK_SIZE).map(toTrackPlayer),
-                            i
-                        );
-                        await sleep(500);
+                        for (let i = 0; i < remainingAfter.length; i += CHUNK_SIZE) {
+                            // cancellation check
+                            if (currentSyncId !== capturedSyncId || get().currentContextId !== capturedContextId) return;
+                            
+                            await TrackPlayer.add(
+                                remainingAfter.slice(i, i + CHUNK_SIZE).map(toTrackPlayer)
+                            );
+                            // yield the bridge
+                            await sleep(500);
+                        }
+
+                        for (let i = 0; i < remainingBefore.length; i += CHUNK_SIZE) {
+                            if (currentSyncId !== capturedSyncId || get().currentContextId !== capturedContextId) return;
+                            
+                            await TrackPlayer.add(
+                                remainingBefore.slice(i, i + CHUNK_SIZE).map(toTrackPlayer),
+                                i
+                            );
+                            await sleep(500);
+                        }
+                    } catch (e) {
+                        console.error("[PlayerStore] backgroundSync failed:", e);
                     }
                 };
 
@@ -326,9 +404,13 @@ export const usePlayerStore = create<PlayerState>()(
             },
 
             toggleShuffle: async () => {
-                const { isShuffleOn, queue, originalQueue, activeTrack } = get();
+                const { isShuffleOn, queue, originalQueue, activeTrack, currentContextId } = get();
                 const { intelligentShuffle } = require("@/utils/shuffleUtils");
                 const nextShuffleState = !isShuffleOn;
+                
+                // Keep the base context, but tag it for shuffle
+                const baseContext = currentContextId?.split('_')[0] || 'default';
+                const nextContextId = nextShuffleState ? `${baseContext}_shuffled` : baseContext;
 
                 if (nextShuffleState) {
                     // SEAMLESS SHUFFLE ON
@@ -339,11 +421,8 @@ export const usePlayerStore = create<PlayerState>()(
                         queue: shuffled 
                     });
                     
-                    // Sync the native queue without resetting audio
                     if (activeTrack) {
-                        const currentPos = await TrackPlayer.getPosition();
-                        await get().play(activeTrack, shuffled, get().currentContextId || 'shuffle-sync');
-                        await TrackPlayer.seekTo(currentPos);
+                        await get().play(activeTrack, shuffled, nextContextId);
                     }
                 } else {
                     // SEAMLESS SHUFFLE OFF (RESTORE)
@@ -355,9 +434,7 @@ export const usePlayerStore = create<PlayerState>()(
                     });
 
                     if (activeTrack) {
-                        const currentPos = await TrackPlayer.getPosition();
-                        await get().play(activeTrack, restored, get().currentContextId || 'shuffle-sync');
-                        await TrackPlayer.seekTo(currentPos);
+                        await get().play(activeTrack, restored, nextContextId);
                     }
                 }
             },
