@@ -119,33 +119,40 @@ export const SongPickerModal: React.FC<Props> = ({ visible, onClose, onAdd }) =>
                 </View>
 
                 {/* Dropdown Menu */}
-                {showMenu && (
-                    <View style={[styles.dropMenu, {
-                        backgroundColor: isDark ? '#2a2a2a' : colors.card,
-                        borderRadius: cornerRadius,
-                        right: spacing.horizontal
-                    }]}>
-                        <TouchableOpacity style={styles.dropItem} onPress={() => { setSortMode('title'); setShowMenu(false); }}>
-                            <Ionicons name="text" size={18} color={sortMode === 'title' ? colors.primary : colors.text} />
-                            <Text style={[styles.dropLabel, { color: sortMode === 'title' ? colors.primary : colors.text, fontSize: fonts.sm }]}>Sort by Title</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.dropItem} onPress={() => { setSortMode('date'); setShowMenu(false); }}>
-                            <Ionicons name="calendar-outline" size={18} color={sortMode === 'date' ? colors.primary : colors.text} />
-                            <Text style={[styles.dropLabel, { color: sortMode === 'date' ? colors.primary : colors.text, fontSize: fonts.sm }]}>Sort by Date</Text>
-                        </TouchableOpacity>
+                <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+                    <TouchableOpacity 
+                        style={styles.modalBackdropTransparent} 
+                        activeOpacity={1} 
+                        onPress={() => setShowMenu(false)}
+                    >
+                        <View style={[styles.dropMenu, {
+                            backgroundColor: isDark ? '#2a2a2a' : colors.card,
+                            borderRadius: cornerRadius,
+                            right: spacing.horizontal,
+                            top: insets.top + 60,
+                        }]}>
+                            <TouchableOpacity style={styles.dropItem} onPress={() => { setSortMode('title'); setShowMenu(false); }}>
+                                <Ionicons name="text" size={18} color={sortMode === 'title' ? colors.primary : colors.text} />
+                                <Text style={[styles.dropLabel, { color: sortMode === 'title' ? colors.primary : colors.text, fontSize: fonts.sm }]}>Sort by Title</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.dropItem} onPress={() => { setSortMode('date'); setShowMenu(false); }}>
+                                <Ionicons name="calendar-outline" size={18} color={sortMode === 'date' ? colors.primary : colors.text} />
+                                <Text style={[styles.dropLabel, { color: sortMode === 'date' ? colors.primary : colors.text, fontSize: fonts.sm }]}>Sort by Date</Text>
+                            </TouchableOpacity>
 
-                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                        <TouchableOpacity style={styles.dropItem} onPress={handleSelectAll}>
-                            <Ionicons name="checkmark-circle-outline" size={18} color={colors.text} />
-                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Select All</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.dropItem} onPress={handleDeselectAll}>
-                            <Ionicons name="close-circle-outline" size={18} color={colors.text} />
-                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Deselect All</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                            <TouchableOpacity style={styles.dropItem} onPress={handleSelectAll}>
+                                <Ionicons name="checkmark-circle-outline" size={18} color={colors.text} />
+                                <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Select All</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.dropItem} onPress={handleDeselectAll}>
+                                <Ionicons name="close-circle-outline" size={18} color={colors.text} />
+                                <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Deselect All</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
 
                 <SongList
                     tracks={sortedTracks}
@@ -238,5 +245,9 @@ const styles = StyleSheet.create({
         height: 1,
         marginVertical: 4,
         opacity: 0.5,
+    },
+    modalBackdropTransparent: {
+        flex: 1,
+        backgroundColor: 'transparent',
     },
 });

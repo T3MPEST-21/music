@@ -68,8 +68,12 @@ export const SongContextMenu: React.FC<Props> = ({ track, visible, onClose, onAd
 
     return (
         <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-                <Pressable style={styles.backdrop} onPress={onClose}>
-                    <View style={[styles.sheet, { backgroundColor: colors.backgroundLight, borderTopLeftRadius: cornerRadius, borderTopRightRadius: cornerRadius }]}>
+                <TouchableOpacity 
+                    style={styles.backdrop} 
+                    activeOpacity={1} 
+                    onPress={onClose}
+                >
+                    <Pressable style={[styles.sheet, { backgroundColor: colors.backgroundLight, borderTopLeftRadius: cornerRadius, borderTopRightRadius: cornerRadius }]} onPress={() => {}}>
                         {/* Track info header */}
                         <View style={styles.header}>
                             <Text style={[styles.trackTitle, { color: colors.text, fontSize: fonts.md }]} numberOfLines={1}>{track.title}</Text>
@@ -90,8 +94,8 @@ export const SongContextMenu: React.FC<Props> = ({ track, visible, onClose, onAd
                             </Text>
                         </TouchableOpacity>
                     ))}
-                </View>
-            </Pressable>
+                    </Pressable>
+                </TouchableOpacity>
         </Modal>
     );
 };

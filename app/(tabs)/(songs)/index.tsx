@@ -214,67 +214,74 @@ const SongsScreen = () => {
             </View>
 
             {/* Sort Menu Dropdown */}
-            {showMenu && (
-                <View style={[styles.dropMenu, {
-                    backgroundColor: isDark ? '#2a2a2a' : colors.card,
-                    borderRadius: cornerRadius,
-                    right: spacing.horizontal
-                }]}>
-                    <View style={styles.dropHeader}>
-                        <Text style={[styles.dropTitle, { color: colors.textMuted, fontSize: fonts.xs }]}>SCREEN OPTIONS</Text>
-                    </View>
+            <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+                <TouchableOpacity 
+                    style={styles.modalBackdropTransparent} 
+                    activeOpacity={1} 
+                    onPress={() => setShowMenu(false)}
+                >
+                    <View style={[styles.dropMenu, {
+                        backgroundColor: isDark ? '#2a2a2a' : colors.card,
+                        borderRadius: cornerRadius,
+                        right: spacing.horizontal,
+                        top: insets.top + 60,
+                    }]}>
+                        <View style={styles.dropHeader}>
+                            <Text style={[styles.dropTitle, { color: colors.textMuted, fontSize: fonts.xs }]}>SCREEN OPTIONS</Text>
+                        </View>
 
-                    <TouchableOpacity style={styles.dropItem} onPress={() => {
-                        const shuffled = shuffleArray([...filteredAndSortedTracks]);
-                        if (shuffled.length > 0) usePlayerStore.getState().play(shuffled[0], shuffled);
-                        setShowMenu(false);
-                    }}>
-                        <Ionicons name="shuffle" size={18} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Shuffle All</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.dropItem} onPress={() => {
-                        fetchTracks();
-                        setShowMenu(false);
-                    }}>
-                        <Ionicons name="refresh" size={18} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Rescan Library</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.dropItem} onPress={() => {
-                        setIsSelectionMode(true);
-                        setSelectedIds(new Set());
-                        setShowMenu(false);
-                    }}>
-                        <Ionicons name="checkbox-outline" size={18} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Select Songs</Text>
-                    </TouchableOpacity>
-
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                    <View style={styles.dropHeader}>
-                        <Text style={[styles.dropTitle, { color: colors.textMuted, fontSize: fonts.xs }]}>SORT BY</Text>
-                    </View>
-                    {([
-                        { label: 'Recently Added', key: 'default' },
-                        { label: 'Title', key: 'title' },
-                        { label: 'Artist', key: 'artist' },
-                    ] as { label: string, key: SortMode }[]).map((item) => (
-                        <TouchableOpacity
-                            key={item.key}
-                            style={styles.dropItem}
-                            onPress={() => { setSortMode(item.key); setShowMenu(false); }}
-                        >
-                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>
-                                {item.label}
-                            </Text>
-                            {sortMode === item.key && (
-                                <Ionicons name="checkmark" size={16} color={colors.primary} style={{ marginLeft: 'auto' }} />
-                            )}
+                        <TouchableOpacity style={styles.dropItem} onPress={() => {
+                            const shuffled = shuffleArray([...filteredAndSortedTracks]);
+                            if (shuffled.length > 0) usePlayerStore.getState().play(shuffled[0], shuffled);
+                            setShowMenu(false);
+                        }}>
+                            <Ionicons name="shuffle" size={18} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Shuffle All</Text>
                         </TouchableOpacity>
-                    ))}
-                </View>
-            )}
+
+                        <TouchableOpacity style={styles.dropItem} onPress={() => {
+                            fetchTracks();
+                            setShowMenu(false);
+                        }}>
+                            <Ionicons name="refresh" size={18} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Rescan Library</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.dropItem} onPress={() => {
+                            setIsSelectionMode(true);
+                            setSelectedIds(new Set());
+                            setShowMenu(false);
+                        }}>
+                            <Ionicons name="checkbox-outline" size={18} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Select Songs</Text>
+                        </TouchableOpacity>
+
+                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                        <View style={styles.dropHeader}>
+                            <Text style={[styles.dropTitle, { color: colors.textMuted, fontSize: fonts.xs }]}>SORT BY</Text>
+                        </View>
+                        {([
+                            { label: 'Recently Added', key: 'default' },
+                            { label: 'Title', key: 'title' },
+                            { label: 'Artist', key: 'artist' },
+                        ] as { label: string, key: SortMode }[]).map((item) => (
+                            <TouchableOpacity
+                                key={item.key}
+                                style={styles.dropItem}
+                                onPress={() => { setSortMode(item.key); setShowMenu(false); }}
+                            >
+                                <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>
+                                    {item.label}
+                                </Text>
+                                {sortMode === item.key && (
+                                    <Ionicons name="checkmark" size={16} color={colors.primary} style={{ marginLeft: 'auto' }} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
             {/* Mood Chips */}
             {taggedMoods.length > 0 && (
@@ -462,5 +469,9 @@ const styles = StyleSheet.create({
         width: 200,
         paddingVertical: 8,
         elevation: 10,
+    },
+    modalBackdropTransparent: {
+        flex: 1,
+        backgroundColor: 'transparent',
     },
 });

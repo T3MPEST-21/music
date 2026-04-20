@@ -190,53 +190,60 @@ export default function PlaylistDetailScreen() {
             </View>
 
             {/* ⋮ Dropdown menu */}
-            {showMenu && (
-                <View style={[styles.dropMenu, {
-                    backgroundColor: isDark ? '#2a2a2a' : colors.card,
-                    borderRadius: cornerRadius,
-                    right: spacing.horizontal
-                }]}>
-                    <TouchableOpacity style={styles.dropItem} onPress={() => { setShowMenu(false); setShowRename(true); setNewName(playlist.name); }}>
-                        <Ionicons name="pencil-outline" size={17} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Rename</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.dropItem} onPress={handlePickArtwork}>
-                        <Ionicons name="image-outline" size={17} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Change Artwork</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.dropItem} onPress={() => setShowSortMenu(v => !v)}>
-                        <Ionicons name="swap-vertical" size={17} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Sort...</Text>
-                    </TouchableOpacity>
-                    {showSortMenu && (
-                        <>
-                            {(['title', 'artist', 'duration', 'dateAdded'] as SortBy[]).map(s => (
-                                <TouchableOpacity key={s} style={[styles.dropItem, styles.subItem]} onPress={() => handleSort(s)}>
-                                    <Text style={[styles.subLabel, { color: colors.textMuted, fontSize: fonts.xs }]}>
-                                        {s === 'title' ? 'By Title' : s === 'artist' ? 'By Artist' : s === 'duration' ? 'By Duration' : 'By Date Added'}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </>
-                    )}
-                    <TouchableOpacity style={styles.dropItem} onPress={() => { 
-                        setShowMenu(false); 
-                        setReorderMode(true);
-                        // Clear search to avoid visual index mismatch
-                        setSearchQuery('');
-                        setIsSearchActive(false);
-                    }}>
-                        <Ionicons name="reorder-three" size={17} color={colors.text} />
-                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Reorder Songs...</Text>
-                    </TouchableOpacity>
-                    {!playlist.isPinned && (
-                        <TouchableOpacity style={styles.dropItem} onPress={handleDelete}>
-                            <Ionicons name="trash-outline" size={17} color={isDark ? "#e74c3c" : "#d32f2f"} />
-                            <Text style={[styles.dropLabel, { color: isDark ? "#e74c3c" : "#d32f2f", fontSize: fonts.sm }]}>Delete Playlist</Text>
+            <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+                <TouchableOpacity 
+                    style={styles.modalBackdropTransparent} 
+                    activeOpacity={1} 
+                    onPress={() => setShowMenu(false)}
+                >
+                    <View style={[styles.dropMenu, {
+                        backgroundColor: isDark ? '#2a2a2a' : colors.card,
+                        borderRadius: cornerRadius,
+                        right: spacing.horizontal,
+                        top: insets.top + 60,
+                    }]}>
+                        <TouchableOpacity style={styles.dropItem} onPress={() => { setShowMenu(false); setShowRename(true); setNewName(playlist.name); }}>
+                            <Ionicons name="pencil-outline" size={17} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Rename</Text>
                         </TouchableOpacity>
-                    )}
-                </View>
-            )}
+                        <TouchableOpacity style={styles.dropItem} onPress={handlePickArtwork}>
+                            <Ionicons name="image-outline" size={17} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Change Artwork</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.dropItem} onPress={() => setShowSortMenu(v => !v)}>
+                            <Ionicons name="swap-vertical" size={17} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Sort...</Text>
+                        </TouchableOpacity>
+                        {showSortMenu && (
+                            <>
+                                {(['title', 'artist', 'duration', 'dateAdded'] as SortBy[]).map(s => (
+                                    <TouchableOpacity key={s} style={[styles.dropItem, styles.subItem]} onPress={() => handleSort(s)}>
+                                        <Text style={[styles.subLabel, { color: colors.textMuted, fontSize: fonts.xs }]}>
+                                            {s === 'title' ? 'By Title' : s === 'artist' ? 'By Artist' : s === 'duration' ? 'By Duration' : 'By Date Added'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </>
+                        )}
+                        <TouchableOpacity style={styles.dropItem} onPress={() => { 
+                            setShowMenu(false); 
+                            setReorderMode(true);
+                            // Clear search to avoid visual index mismatch
+                            setSearchQuery('');
+                            setIsSearchActive(false);
+                        }}>
+                            <Ionicons name="reorder-three" size={17} color={colors.text} />
+                            <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Reorder Songs...</Text>
+                        </TouchableOpacity>
+                        {!playlist.isPinned && (
+                            <TouchableOpacity style={styles.dropItem} onPress={handleDelete}>
+                                <Ionicons name="trash-outline" size={17} color={isDark ? "#e74c3c" : "#d32f2f"} />
+                                <Text style={[styles.dropLabel, { color: isDark ? "#e74c3c" : "#d32f2f", fontSize: fonts.sm }]}>Delete Playlist</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
             {/* Playlist info */}
             <View style={[styles.info, { paddingHorizontal: spacing.horizontal }]}>
@@ -516,5 +523,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.03)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    modalBackdropTransparent: {
+        flex: 1,
+        backgroundColor: 'transparent',
     },
 });

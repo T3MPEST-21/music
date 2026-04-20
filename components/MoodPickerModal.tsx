@@ -109,12 +109,16 @@ export const MoodPickerModal: React.FC<Props> = ({ visible, trackIds, onClose })
                 onRequestClose={onClose}
                 onShow={handleOpen}
             >
-                <Pressable style={styles.backdrop} onPress={onClose}>
-                    <View style={[styles.sheet, {
+                <TouchableOpacity 
+                    style={styles.backdrop} 
+                    activeOpacity={1} 
+                    onPress={onClose}
+                >
+                    <Pressable style={[styles.sheet, {
                         backgroundColor: isDark ? '#1a1a1a' : colors.backgroundLight,
                         borderTopLeftRadius: cornerRadius + 6,
                         borderTopRightRadius: cornerRadius + 6,
-                    }]}>
+                    }]} onPress={() => {}}>
                         {/* Header */}
                         <View style={styles.header}>
                             <Text style={[styles.title, { color: colors.text, fontSize: fonts.md }]}>
@@ -144,8 +148,8 @@ export const MoodPickerModal: React.FC<Props> = ({ visible, trackIds, onClose })
                                 </TouchableOpacity>
                             }
                         />
-                    </View>
-                </Pressable>
+                    </Pressable>
+                </TouchableOpacity>
             </Modal>
 
             <AddMoodModal
