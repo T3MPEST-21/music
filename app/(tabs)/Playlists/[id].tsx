@@ -69,13 +69,19 @@ export default function PlaylistDetailScreen() {
     };
 
     const handleMove = (direction: 'up' | 'down') => {
-        if (!id || !focusedTrackId) return;
-        const currentTracks = getPlaylistTracks(id);
-        const index = currentTracks.findIndex(t => t.id === focusedTrackId);
+        if (!id || !focusedTrackId || !playlist) return;
+        
+        // Use raw trackIds from playlist to find the true index
+        const index = playlist.trackIds.findIndex(tid => tid === focusedTrackId);
+
+        if (index === -1) {
+            console.warn('[Playlist] Attempted to move track not in playlist IDs');
+            return;
+        }
 
         if (direction === 'up' && index > 0) {
             reorderPlaylistTracks(id, index, index - 1);
-        } else if (direction === 'down' && index < currentTracks.length - 1) {
+        } else if (direction === 'down' && index < playlist.trackIds.length - 1) {
             reorderPlaylistTracks(id, index, index + 1);
         }
     };
@@ -213,7 +219,13 @@ export default function PlaylistDetailScreen() {
                             ))}
                         </>
                     )}
-                    <TouchableOpacity style={styles.dropItem} onPress={() => { setShowMenu(false); setReorderMode(true); }}>
+                    <TouchableOpacity style={styles.dropItem} onPress={() => { 
+                        setShowMenu(false); 
+                        setReorderMode(true);
+                        // Clear search to avoid visual index mismatch
+                        setSearchQuery('');
+                        setIsSearchActive(false);
+                    }}>
                         <Ionicons name="reorder-three" size={17} color={colors.text} />
                         <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Reorder Songs...</Text>
                     </TouchableOpacity>

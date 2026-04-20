@@ -278,10 +278,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => {
         },
 
         reorderPlaylistTracks: (playlistId, fromIndex, toIndex) => {
+            if (fromIndex < 0 || toIndex < 0) return;
             set(state => {
                 const updated = state.playlists.map(p => {
                     if (p.id !== playlistId) return p;
                     const ids = [...p.trackIds];
+                    if (fromIndex >= ids.length || toIndex >= ids.length) return p;
+
                     const [moved] = ids.splice(fromIndex, 1);
                     ids.splice(toIndex, 0, moved);
                     return { ...p, trackIds: ids };
