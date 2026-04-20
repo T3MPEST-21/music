@@ -7,15 +7,17 @@ import TrackPlayer, {
 } from "react-native-track-player";
 import { create } from "zustand";
 import { Track } from "./libraryStore";
+import { useToastStore } from "./toastStore";
 import { useThemeStore } from "./themeStore";
 
 interface PlayerState {
     activeTrack: Track | null;
-    isPlaying: boolean; // UI reflection — source of truth is TrackPlayer
+    isPlaying: boolean;
     queue: Track[];
     repeatMode: RepeatMode;
     isShuffleOn: boolean;
     sleepTimerEndsAt: number | null;
+    consecutiveErrors: number; // Internal counter for skip-safety
     // Actions
     play: (track: Track, contextQueue?: Track[]) => Promise<void>;
     pause: () => Promise<void>;
@@ -51,6 +53,7 @@ export const usePlayerStore = create<PlayerState>()(
             repeatMode: RepeatMode.Off,
             isShuffleOn: false,
             sleepTimerEndsAt: null,
+            consecutiveErrors: 0,
 
             setupPlayer: async () => {
                 // Initialize the player
@@ -84,6 +87,34 @@ export const usePlayerStore = create<PlayerState>()(
                     // Add central listeners
                     TrackPlayer.addEventListener(Event.PlaybackState, ({ state }) => {
                         set({ isPlaying: state === State.Playing });
+                        
+                        // Reset consecutive error count as soon as we prove sound can play
+                        if (state === State.Playing) {
+                            set({ consecutiveErrors: 0 });
+                        }
+                    });
+
+                    // Graceful fallback for missing/corrupted tracks
+                    TrackPlayer.addEventListener(Event.PlaybackError, async () => {
+                        const { consecutiveErrors, next, stop } = get();
+                        const { showToast } = useToastStore.getState();
+                        
+                        // Get track info for better toast message
+                        const index = await TrackPlayer.getActiveTrackIndex();
+                        const track = index !== undefined ? await TrackPlayer.getTrack(index) : null;
+                        const trackName = track?.title || 'Unknown Track';
+
+                        const newErrorCount = consecutiveErrors + 1;
+                        set({ consecutiveErrors: newErrorCount });
+
+                        if (newErrorCount < 5) {
+                            showToast(`File Issue: Skipping "${trackName}"...`, 'info');
+                            await next();
+                        } else {
+                            showToast(`Too many invalid files. Stopping playback.`, 'error');
+                            await stop(); // This also resets activeTrack and isPlaying in our store
+                            set({ consecutiveErrors: 0 }); 
+                        }
                     });
 
                     TrackPlayer.addEventListener(Event.PlaybackTrackChanged, async () => {
@@ -251,6 +282,7 @@ export const usePlayerStore = create<PlayerState>()(
                 repeatMode: state.repeatMode,
                 isShuffleOn: state.isShuffleOn,
                 sleepTimerEndsAt: state.sleepTimerEndsAt,
+                // consecutiveErrors is volatile, never persist it
             }),
             // Never persist isPlaying; always start paused after restart
         }
