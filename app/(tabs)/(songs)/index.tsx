@@ -96,6 +96,10 @@ const SongsScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeMoodId, setActiveMoodId] = useState<string | 'all'>('all');
     const [actionMoodId, setActionMoodId] = useState<string | null>(null);
+    
+    // Multi-selection state
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (!initialized) loadFromCache();
@@ -237,6 +241,15 @@ const SongsScreen = () => {
                         <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Rescan Library</Text>
                     </TouchableOpacity>
 
+                    <TouchableOpacity style={styles.dropItem} onPress={() => {
+                        setIsSelectionMode(true);
+                        setSelectedIds(new Set());
+                        setShowMenu(false);
+                    }}>
+                        <Ionicons name="checkbox-outline" size={18} color={colors.text} />
+                        <Text style={[styles.dropLabel, { color: colors.text, fontSize: fonts.sm }]}>Select Songs</Text>
+                    </TouchableOpacity>
+
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
                     <View style={styles.dropHeader}>
@@ -347,7 +360,13 @@ const SongsScreen = () => {
                 </TouchableOpacity>
             </Modal>
 
-            <SongList tracks={filteredAndSortedTracks} />
+            <SongList 
+                tracks={filteredAndSortedTracks} 
+                selectionMode={isSelectionMode}
+                onSelectionModeChange={setIsSelectionMode}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+            />
         </View>
     );
 };

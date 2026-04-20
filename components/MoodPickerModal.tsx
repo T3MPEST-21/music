@@ -15,34 +15,64 @@ import {
 
 interface Props {
     visible: boolean;
-    trackId: string;
+    trackIds: string[];
     onClose: () => void;
 }
 
-export const MoodPickerModal: React.FC<Props> = ({ visible, trackId, onClose }) => {
+export const MoodPickerModal: React.FC<Props> = ({ visible, trackIds, onClose }) => {
     const { colors, fonts, cornerRadius, isDark } = useTheme();
-    const { moods, trackMoodMap, setTrackMoods } = useMoodStore();
+    const { moods, trackMoodMap, setTrackMoods, batchUpdateMoods } = useMoodStore();
     const [showAddMood, setShowAddMood] = useState(false);
 
-    // Local selection state (initialized from store every open)
-    const currentMoodIds = trackMoodMap[trackId] || [];
-    const [selected, setSelected] = useState<Set<string>>(new Set(currentMoodIds));
+    // For single track: direct selection
+    // For bulk: additive selection (what do we ADD and what do we REMOVE)
+    const isBulk = trackIds.length > 1;
+    
+    // Initial state for single track
+    const initialMoodIds = !isBulk ? (trackMoodMap[trackIds[0]] || []) : [];
+    
+    // Active selection state
+    const [selected, setSelected] = useState<Set<string>>(new Set(initialMoodIds));
+    
+    // Tracks what was explicitly added or removed in this session
+    const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+    const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
 
     const handleOpen = () => {
-        // Sync selection when modal opens
-        setSelected(new Set(trackMoodMap[trackId] || []));
+        const initial = !isBulk ? (trackMoodMap[trackIds[0]] || []) : [];
+        setSelected(new Set(initial));
+        setAddedIds(new Set());
+        setRemovedIds(new Set());
     };
 
     const toggleMood = (moodId: string) => {
         setSelected(prev => {
             const next = new Set(prev);
-            next.has(moodId) ? next.delete(moodId) : next.add(moodId);
+            if (next.has(moodId)) {
+                next.delete(moodId);
+                // If bulk, track that we removed this
+                if (isBulk) {
+                    setRemovedIds(r => new Set(r).add(moodId));
+                    setAddedIds(a => { const n = new Set(a); n.delete(moodId); return n; });
+                }
+            } else {
+                next.add(moodId);
+                // If bulk, track that we added this
+                if (isBulk) {
+                    setAddedIds(a => new Set(a).add(moodId));
+                    setRemovedIds(r => { const n = new Set(r); n.delete(moodId); return n; });
+                }
+            }
             return next;
         });
     };
 
     const handleDone = () => {
-        setTrackMoods(trackId, Array.from(selected));
+        if (isBulk) {
+            batchUpdateMoods(trackIds, Array.from(addedIds), Array.from(removedIds));
+        } else {
+            setTrackMoods(trackIds[0], Array.from(selected));
+        }
         onClose();
     };
 

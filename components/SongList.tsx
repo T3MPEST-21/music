@@ -1,3 +1,4 @@
+import { BulkActionBar } from '@/components/BulkActionBar';
 import { MoodPickerModal } from '@/components/MoodPickerModal';
 import { PlaylistPickerModal } from '@/components/PlaylistPickerModal';
 import { SongContextMenu } from '@/components/SongContextMenu';
@@ -20,6 +21,7 @@ interface SongListProps {
     tracks: Track[];
     /** When true, shows checkboxes for multi-select (used in song picker flow) */
     selectionMode?: boolean;
+    onSelectionModeChange?: (active: boolean) => void;
     selectedIds?: Set<string>;
     onSelectionChange?: (ids: Set<string>) => void;
     /** Reorder mode — shows ↑↓ arrows instead of ⋮ */
@@ -135,19 +137,40 @@ export const SongList = ({
     onSelect,
     onMoveStart,
     onMoveEnd,
+    onSelectionModeChange,
     onRemove,
 }: SongListProps) => {
     const { colors, fonts } = useTheme();
     const { play, activeTrack } = usePlayerStore();
+    
+    // Internal selection state for "Uncontrolled" mode (triggered from context menu)
+    const [internalSelectionMode, setInternalSelectionMode] = useState(false);
+    const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(new Set());
+
     const [contextMenuTrack, setContextMenuTrack] = useState<Track | null>(null);
     const [playlistPickerTrack, setPlaylistPickerTrack] = useState<Track | null>(null);
     const [moodPickerTrack, setMoodPickerTrack] = useState<Track | null>(null);
 
+    // Merge props with internal state
+    const isSelectionActive = selectionMode ?? internalSelectionMode;
+    const currentSelectedIds = selectedIds ?? internalSelectedIds;
+
     const toggleSelect = (id: string) => {
-        if (!selectedIds || !onSelectionChange) return;
-        const next = new Set(selectedIds);
+        const next = new Set(currentSelectedIds);
         next.has(id) ? next.delete(id) : next.add(id);
-        onSelectionChange(next);
+        
+        if (onSelectionChange) {
+            onSelectionChange(next);
+        } else {
+            setInternalSelectedIds(next);
+        }
+    };
+
+    const clearSelection = () => {
+        setInternalSelectionMode(false);
+        setInternalSelectedIds(new Set());
+        if (onSelectionChange) onSelectionChange(new Set());
+        if (onSelectionModeChange) onSelectionModeChange(false);
     };
 
     return (
@@ -161,8 +184,8 @@ export const SongList = ({
                         isPlaying={activeTrack?.id === item.id}
                         isFocused={focusedTrackId === item.id}
                         onSelect={() => onSelect ? onSelect(item) : play(item, tracks)}
-                        selectionMode={selectionMode}
-                        isSelected={selectedIds?.has(item.id)}
+                        selectionMode={isSelectionActive}
+                        isSelected={currentSelectedIds.has(item.id)}
                         onToggleSelect={() => toggleSelect(item.id)}
                         reorderMode={reorderMode}
                         onMoveStart={(dir) => onMoveStart?.(index, dir)}
@@ -196,6 +219,11 @@ export const SongList = ({
                         setMoodPickerTrack(contextMenuTrack);
                         setContextMenuTrack(null);
                     }}
+                    onSelectMode={() => {
+                        setInternalSelectionMode(true);
+                        setInternalSelectedIds(new Set([contextMenuTrack.id]));
+                        setContextMenuTrack(null);
+                    }}
                     onRemove={onRemove ? () => onRemove(contextMenuTrack) : undefined}
                 />
             )}
@@ -213,8 +241,16 @@ export const SongList = ({
             {moodPickerTrack && (
                 <MoodPickerModal
                     visible={!!moodPickerTrack}
-                    trackId={moodPickerTrack.id}
+                    trackIds={[moodPickerTrack.id]}
                     onClose={() => setMoodPickerTrack(null)}
+                />
+            )}
+
+            {/* Bulk Action Bar (Only shows in internal mode or if prop selectionMode is managed) */}
+            {isSelectionActive && (
+                <BulkActionBar 
+                    selectedIds={currentSelectedIds} 
+                    onClearSelection={clearSelection} 
                 />
             )}
         </View>

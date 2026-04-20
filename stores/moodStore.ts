@@ -71,6 +71,7 @@ interface MoodState {
     getTrackMoods: (trackId: string) => Mood[];
     getMoodTrackIds: (moodId: string) => string[];
     getTaggedTrackCount: (moodId: string) => number;
+    batchUpdateMoods: (trackIds: string[], addMoodIds: string[], removeMoodIds: string[]) => void;
 }
 
 export const useMoodStore = create<MoodState>((set, get) => ({
@@ -160,5 +161,31 @@ export const useMoodStore = create<MoodState>((set, get) => ({
 
     getTaggedTrackCount: (moodId) => {
         return get().getMoodTrackIds(moodId).length;
+    },
+
+    batchUpdateMoods: (trackIds, addMoodIds, removeMoodIds) => {
+        set(state => {
+            const updated = { ...state.trackMoodMap };
+            trackIds.forEach(trackId => {
+                let current = updated[trackId] || [];
+                // Add unique new moods
+                const toAdd = addMoodIds.filter(m => !current.includes(m));
+                if (toAdd.length > 0) {
+                    current = [...current, ...toAdd];
+                }
+                // Remove specified moods
+                if (removeMoodIds.length > 0) {
+                    current = current.filter(m => !removeMoodIds.includes(m));
+                }
+
+                if (current.length === 0) {
+                    delete updated[trackId];
+                } else {
+                    updated[trackId] = current;
+                }
+            });
+            persistTrackMoodMap(updated);
+            return { trackMoodMap: updated };
+        });
     },
 }));

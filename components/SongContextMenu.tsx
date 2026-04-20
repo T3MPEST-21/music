@@ -19,10 +19,11 @@ interface Props {
     onClose: () => void;
     onAddToPlaylist: () => void; // Opens PlaylistPickerModal
     onTagMood: () => void; // Opens MoodPickerModal
+    onSelectMode: () => void; // Enables selection mode in parent
     onRemove?: () => void; // Optional: Remove from current playlist
 }
 
-export const SongContextMenu: React.FC<Props> = ({ track, visible, onClose, onAddToPlaylist, onTagMood, onRemove }) => {
+export const SongContextMenu: React.FC<Props> = ({ track, visible, onClose, onAddToPlaylist, onTagMood, onSelectMode, onRemove }) => {
     const { colors, fonts, cornerRadius } = useTheme();
     const { toggleFavorite, isFavorite } = useLibraryStore();
     const { queue, play } = usePlayerStore();
@@ -52,6 +53,7 @@ export const SongContextMenu: React.FC<Props> = ({ track, visible, onClose, onAd
             color: favorite ? colors.danger : undefined,
         },
         { icon: 'person', label: 'Go to Artist', action: handleGoToArtist },
+        { icon: 'checkbox-outline', label: 'Select', action: () => { onClose(); onSelectMode(); } },
         { icon: 'pricetag-outline', label: 'Tag Mood', action: () => { onClose(); setTimeout(onTagMood, 300); } },
     ];
 
