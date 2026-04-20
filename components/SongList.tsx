@@ -33,7 +33,7 @@ interface SongListProps {
     onRemove?: (track: Track) => void;
 }
 
-const SongItem = ({
+export const SongItem = ({
     track,
     index,
     isPlaying,

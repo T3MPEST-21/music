@@ -14,6 +14,7 @@ interface PlayerState {
     activeTrack: Track | null;
     isPlaying: boolean;
     queue: Track[];
+    originalQueue: Track[]; // The A-Z/Original list for 'Return Path'
     repeatMode: RepeatMode;
     isShuffleOn: boolean;
     sleepTimerEndsAt: number | null;
@@ -34,6 +35,7 @@ interface PlayerState {
 
 import { storage, StorageKeys } from '@/utils/storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { smartShuffle } from '@/utils/playerUtils';
 
 // Adapter for MMKV
 const mmkvStorage = {
@@ -50,6 +52,7 @@ export const usePlayerStore = create<PlayerState>()(
             activeTrack: null,
             isPlaying: false,
             queue: [],
+            originalQueue: [],
             repeatMode: RepeatMode.Off,
             isShuffleOn: false,
             sleepTimerEndsAt: null,
@@ -200,7 +203,14 @@ export const usePlayerStore = create<PlayerState>()(
 
                 // SLOW PATH: New context or context not provided
                 // Convert to TrackPlayer Object
-                const trackPlayerQueue = currentQueue.map(t => ({
+                let finalQueue = [...currentQueue];
+                
+                // If shuffle is on, we generate the shuffled sequence now
+                if (get().isShuffleOn) {
+                    finalQueue = smartShuffle(currentQueue, track.id);
+                }
+
+                const trackPlayerQueue = finalQueue.map(t => ({
                     id: t.id,
                     url: t.url,
                     title: t.title,
@@ -212,8 +222,8 @@ export const usePlayerStore = create<PlayerState>()(
                 await TrackPlayer.reset();
                 await TrackPlayer.add(trackPlayerQueue);
 
-                // Find index of the clicked track
-                const index = trackPlayerQueue.findIndex(t => t.id === track.id);
+                // With smartShuffle, the clicked track is guaranteed at index 0
+                const index = finalQueue.findIndex(t => t.id === track.id);
                 if (index !== -1) {
                     await TrackPlayer.skip(index);
                 }
@@ -222,7 +232,8 @@ export const usePlayerStore = create<PlayerState>()(
                 set({ 
                     activeTrack: track, 
                     isPlaying: true, 
-                    queue: currentQueue,
+                    queue: finalQueue,
+                    originalQueue: currentQueue, // Store the master order
                     activeContextId: currentContextId
                 });
             },
@@ -250,9 +261,45 @@ export const usePlayerStore = create<PlayerState>()(
                 // Logic to update TrackPlayer queue in background...
             },
 
-            toggleShuffle: () => {
-                // Complex shuffle logic to be implemented
-                set(state => ({ isShuffleOn: !state.isShuffleOn }));
+            toggleShuffle: async () => {
+                const newState = !get().isShuffleOn;
+                const { originalQueue, queue, activeTrack } = get();
+
+                if (!activeTrack || originalQueue.length === 0) {
+                    set({ isShuffleOn: newState });
+                    return;
+                }
+
+                let nextQueue = [];
+                if (newState) {
+                    // Turn ON: Shuffle the original list
+                    nextQueue = smartShuffle(originalQueue, activeTrack.id);
+                } else {
+                    // Turn OFF: Restore original order
+                    nextQueue = [...originalQueue];
+                }
+
+                // Update Native Queue
+                const trackPlayerQueue = nextQueue.map(t => ({
+                    id: t.id,
+                    url: t.url,
+                    title: t.title,
+                    artist: t.artist,
+                    duration: t.duration || 0,
+                    artwork: t.artwork
+                }));
+
+                await TrackPlayer.reset();
+                await TrackPlayer.add(trackPlayerQueue);
+
+                // Reposition to current track
+                const index = nextQueue.findIndex(t => t.id === activeTrack.id);
+                if (index !== -1) {
+                    await TrackPlayer.skip(index);
+                    await TrackPlayer.play();
+                }
+
+                set({ isShuffleOn: newState, queue: nextQueue });
             },
 
             toggleRepeat: () => {
@@ -298,6 +345,7 @@ export const usePlayerStore = create<PlayerState>()(
             partialize: (state) => ({
                 activeTrack: state.activeTrack,
                 queue: state.queue,
+                originalQueue: state.originalQueue,
                 repeatMode: state.repeatMode,
                 isShuffleOn: state.isShuffleOn,
                 sleepTimerEndsAt: state.sleepTimerEndsAt,
