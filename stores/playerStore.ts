@@ -17,9 +17,9 @@ interface PlayerState {
     repeatMode: RepeatMode;
     isShuffleOn: boolean;
     sleepTimerEndsAt: number | null;
-    consecutiveErrors: number; // Internal counter for skip-safety
+    activeContextId: string | null;
     // Actions
-    play: (track: Track, contextQueue?: Track[]) => Promise<void>;
+    play: (track: Track, contextQueue?: Track[], contextId?: string) => Promise<void>;
     pause: () => Promise<void>;
     resume: () => Promise<void>;
     next: () => Promise<void>;
@@ -54,6 +54,7 @@ export const usePlayerStore = create<PlayerState>()(
             isShuffleOn: false,
             sleepTimerEndsAt: null,
             consecutiveErrors: 0,
+            activeContextId: null,
 
             setupPlayer: async () => {
                 // Initialize the player
@@ -172,8 +173,9 @@ export const usePlayerStore = create<PlayerState>()(
                 }
             },
 
-            play: async (track: Track, contextQueue) => {
+            play: async (track: Track, contextQueue, contextId) => {
                 const currentQueue = contextQueue || [track];
+                const currentContextId = contextId || null;
 
                 // Safety: ensure setup has been called
                 try {
@@ -185,6 +187,18 @@ export const usePlayerStore = create<PlayerState>()(
                     await get().setupPlayer();
                 }
 
+                // FAST PATH: Same context, track already in queue
+                if (currentContextId && currentContextId === get().activeContextId) {
+                    const index = get().queue.findIndex(t => t.id === track.id);
+                    if (index !== -1) {
+                        await TrackPlayer.skip(index);
+                        await TrackPlayer.play();
+                        set({ activeTrack: track, isPlaying: true });
+                        return;
+                    }
+                }
+
+                // SLOW PATH: New context or context not provided
                 // Convert to TrackPlayer Object
                 const trackPlayerQueue = currentQueue.map(t => ({
                     id: t.id,
@@ -205,7 +219,12 @@ export const usePlayerStore = create<PlayerState>()(
                 }
 
                 await TrackPlayer.play();
-                set({ activeTrack: track, isPlaying: true, queue: currentQueue });
+                set({ 
+                    activeTrack: track, 
+                    isPlaying: true, 
+                    queue: currentQueue,
+                    activeContextId: currentContextId
+                });
             },
 
             pause: async () => {
@@ -282,6 +301,7 @@ export const usePlayerStore = create<PlayerState>()(
                 repeatMode: state.repeatMode,
                 isShuffleOn: state.isShuffleOn,
                 sleepTimerEndsAt: state.sleepTimerEndsAt,
+                activeContextId: state.activeContextId,
                 // consecutiveErrors is volatile, never persist it
             }),
             // Never persist isPlaying; always start paused after restart

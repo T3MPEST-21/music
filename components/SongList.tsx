@@ -139,6 +139,7 @@ export const SongList = ({
     onMoveEnd,
     onSelectionModeChange,
     onRemove,
+    contextId,
 }: SongListProps) => {
     const { colors, fonts } = useTheme();
     const { play, activeTrack } = usePlayerStore();
@@ -183,7 +184,7 @@ export const SongList = ({
                         index={index}
                         isPlaying={activeTrack?.id === item.id}
                         isFocused={focusedTrackId === item.id}
-                        onSelect={() => onSelect ? onSelect(item) : play(item, tracks)}
+                        onSelect={() => onSelect ? onSelect(item) : play(item, tracks, contextId)}
                         selectionMode={isSelectionActive}
                         isSelected={currentSelectedIds.has(item.id)}
                         onToggleSelect={() => toggleSelect(item.id)}

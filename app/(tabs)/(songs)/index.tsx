@@ -373,6 +373,7 @@ const SongsScreen = () => {
                 onSelectionModeChange={setIsSelectionMode}
                 selectedIds={selectedIds}
                 onSelectionChange={setSelectedIds}
+                contextId="library"
             />
         </View>
     );

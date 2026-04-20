@@ -263,7 +263,7 @@ export default function PlaylistDetailScreen() {
                     {playlistTracks.length > 0 && (
                         <TouchableOpacity
                             style={[styles.playBtn, { backgroundColor: colors.primary }]}
-                            onPress={() => playlistTracks.length > 0 && play(playlistTracks[0], playlistTracks)}
+                            onPress={() => playlistTracks.length > 0 && play(playlistTracks[0], playlistTracks, `playlist-${id}`)}
                         >
                             <Ionicons name="play" size={16} color="#fff" />
                             <Text style={[styles.playBtnText, { fontSize: fonts.xs }]}>Play All</Text>
@@ -281,10 +281,11 @@ export default function PlaylistDetailScreen() {
                     if (reorderMode) {
                         setFocusedTrackId(track.id === focusedTrackId ? null : track.id);
                     } else {
-                        play(track, filteredTracks);
+                        play(track, filteredTracks, `playlist-${id}`);
                     }
                 }}
                 onRemove={(track) => id && removeTrackFromPlaylist(id, track.id)}
+                contextId={`playlist-${id}`}
             />
 
             {/* Global Reorder Bar */}

@@ -26,7 +26,7 @@ const ArtistDetailScreen = () => {
 
     const handlePlayAll = () => {
         if (artistTracks.length > 0) {
-            play(artistTracks[0], artistTracks);
+            play(artistTracks[0], artistTracks, `artist-${name}`);
         }
     };
 
@@ -79,7 +79,7 @@ const ArtistDetailScreen = () => {
             </View>
 
             {/* Song List */}
-            <SongList tracks={artistTracks} />
+            <SongList tracks={artistTracks} contextId={`artist-${name}`} />
         </View>
     );
 };
